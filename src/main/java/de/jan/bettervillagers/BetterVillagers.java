@@ -8,7 +8,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Consumer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -110,14 +109,14 @@ public class BetterVillagers extends JavaPlugin implements Listener {
             return;
         }
 
-        openSearchMenu(player, searchData.villager(), Optional.of(normalized));
+        player.getScheduler().execute(this, () -> openSearchMenu(player, searchData.villager(), Optional.of(normalized)), null);
     }
 
     private void handleMainMenuClick(Player player, Villager villager, int slot) {
         if (slot == 11) {
-            openTradesMenu(player, villager);
+            player.getScheduler().execute(this, () -> openTradesMenu(player, villager), null);
         } else if (slot == 15) {
-            openSearchMenu(player, villager, Optional.empty());
+            player.getScheduler().execute(this, () -> openSearchMenu(player, villager, Optional.empty()), null);
         } else if (slot == 22) {
             player.closeInventory();
         }
@@ -126,7 +125,7 @@ public class BetterVillagers extends JavaPlugin implements Listener {
     private void handleTradesMenuClick(Player player, Villager villager, int slot, TradesMenuHolder holder) {
         int size = holder.size();
         if (slot == size - 9) {
-            openSearchMenu(player, villager, Optional.empty());
+            player.getScheduler().execute(this, () -> openSearchMenu(player, villager, Optional.empty()), null);
         } else if (slot == size - 5) {
             attemptTradeReset(player, villager);
         } else if (slot == size - 1) {
@@ -140,9 +139,9 @@ public class BetterVillagers extends JavaPlugin implements Listener {
             searchingPlayers.put(player.getUniqueId(), new VillagerSearchData(villager, holder.filter()));
             player.sendMessage(message("Gib den Suchbegriff im Chat ein (oder 'cancel' zum Abbrechen)", NamedTextColor.YELLOW));
         } else if (slot == 49) {
-            openSearchMenu(player, villager, Optional.empty());
+            player.getScheduler().execute(this, () -> openSearchMenu(player, villager, Optional.empty()), null);
         } else if (slot == 53) {
-            openTradesMenu(player, villager);
+            player.getScheduler().execute(this, () -> openTradesMenu(player, villager), null);
         }
     }
 
@@ -179,10 +178,7 @@ public class BetterVillagers extends JavaPlugin implements Listener {
     }
 
     private void openTradesMenu(Player player, Villager villager) {
-        withVillagerRecipes(player, villager, recipes -> openTradesMenu(player, recipes));
-    }
-
-    private void openTradesMenu(Player player, List<MerchantRecipe> recipes) {
+        List<MerchantRecipe> recipes = villager.getRecipes();
         int totalSlots = Math.min(54, ((recipes.size() + 8) / 9 + 1) * 9);
         Inventory inventory = Bukkit.createInventory(new TradesMenuHolder(totalSlots), totalSlots,
             message("Villager Trades", NamedTextColor.GOLD));
@@ -204,10 +200,7 @@ public class BetterVillagers extends JavaPlugin implements Listener {
     }
 
     private void openSearchMenu(Player player, Villager villager, Optional<String> filter) {
-        withVillagerRecipes(player, villager, recipes -> openSearchMenu(player, recipes, filter));
-    }
-
-    private void openSearchMenu(Player player, List<MerchantRecipe> recipes, Optional<String> filter) {
+        List<MerchantRecipe> recipes = villager.getRecipes();
         List<MerchantRecipe> filtered = filter
             .map(text -> recipes.stream().filter(recipe -> tradeMatches(recipe, text)).toList())
             .orElse(recipes);
@@ -234,13 +227,6 @@ public class BetterVillagers extends JavaPlugin implements Listener {
         inventory.setItem(49, menuItem(Material.BOOK, "Alle Trades anzeigen", NamedTextColor.GREEN, List.of()));
         inventory.setItem(53, menuItem(Material.ARROW, "Zurück", NamedTextColor.GRAY, List.of()));
         player.openInventory(inventory);
-    }
-
-    private void withVillagerRecipes(Player player, Villager villager, Consumer<List<MerchantRecipe>> consumer) {
-        villager.getScheduler().execute(this, () -> {
-            List<MerchantRecipe> recipes = new ArrayList<>(villager.getRecipes());
-            player.getScheduler().execute(this, () -> consumer.accept(recipes), null);
-        }, null);
     }
 
     private ItemStack tradeItem(MerchantRecipe recipe, int index) {
